@@ -81,6 +81,10 @@ This project also uses:
 ### Linux (WSL)
 
 ```bash
-g++ src/*.cpp -o Sudoku -I/usr/local/include -L/usr/local/lib -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+g++ src/*.cpp -o Sudoku \
+-Iinclude \
+-I/usr/local/include \
+-L/usr/local/lib \
+-lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 ./Sudoku
