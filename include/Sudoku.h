@@ -27,6 +27,8 @@ private:
     int answer[MAX_BOARD_SIZE][MAX_BOARD_SIZE];
     bool memo[MAX_BOARD_SIZE][MAX_BOARD_SIZE][MAX_BOARD_SIZE + 1];
 
+    int solutionCount;  // 解の数
+
     int boardSize;
     int boardBrock;
     int memoMode;
@@ -44,7 +46,8 @@ private:
     enum SudokuMode{
         NORMAL_SUDOKU = 0,
         KILLER_SUDOKU = 1,
-        LARGE_SUDOKU = 2
+        LARGE_SUDOKU = 2,
+        KILLER_LARGE_SUDOKU = 3
     };
 
     SudokuMode sudokuMode = NORMAL_SUDOKU;
@@ -52,11 +55,11 @@ private:
     struct Cage{
         int sum; // 合計
         int count;  // マス数
-        int row[MAX_BOARD_SIZE];
-        int col[MAX_BOARD_SIZE]; // 最大16マス
+        int row[MAX_BOARD_SIZE * MAX_BOARD_SIZE];
+        int col[MAX_BOARD_SIZE * MAX_BOARD_SIZE]; // 最大16マス
     };
 
-    Cage cages[30];
+    Cage cages[256];
     int cageCount;
     int cageMap[MAX_BOARD_SIZE][MAX_BOARD_SIZE];
     bool visited[MAX_BOARD_SIZE][MAX_BOARD_SIZE];
@@ -69,9 +72,12 @@ public:
     void CreateQuestion();
     void CreateKillerQuestion();
     bool CreateCage();
+    bool CreateLargeCage();
     void GrowCage(int startRow, int startCol, int targetSize);
+    void GrowLargeCage(int startRow, int startCol, int target);
     bool HasSingleCellCage();
     void MergeSingleCellCage();
+    void CompressCage();
     int CountUnusedCell() const;
     int GetCageIndex(int row, int col);
 
@@ -97,4 +103,8 @@ public:
     void SetSudokuFlag(int flag);
     int GetSudokuFlag() const;
     SudokuMode GetSudokuMode() const;
+
+    void SolveCount(int board[MAX_BOARD_SIZE][MAX_BOARD_SIZE]);
+    bool CanPlace(int board[MAX_BOARD_SIZE][MAX_BOARD_SIZE], int row, int col, int num);
+    bool CheckUnique();
 };

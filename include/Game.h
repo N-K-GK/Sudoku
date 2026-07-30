@@ -21,6 +21,7 @@ private:
     Rectangle sudokuBtn;
     Rectangle killersudokuBtn;
     Rectangle largesudokuBtn;
+    Rectangle killerlargeBtn;
     Rectangle exitBtn;
 
     Font jpFont;
