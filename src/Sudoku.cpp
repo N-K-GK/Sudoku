@@ -14,11 +14,12 @@ Sudoku::Sudoku(){
     elapsedTime = 0;
     memoMode = 0;
     exitflag = 1;
+    solutionCount=0;
 
 }
 
 void Sudoku::InitBoard(){
-    if(sudokuMode == LARGE_SUDOKU){
+    if(sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU){
         boardSize = 16;
         boardBrock = 4;
         CELL_SIZE = 50.0f;
@@ -219,47 +220,114 @@ void Sudoku::CreateQuestion(){
         if(difficulty == 0){
             visible = 25;
         }else if(difficulty == 1){
-            visible = 18;
+            visible = 23;
         }else if(difficulty == 3){
-            visible = 0;
+            visible = 19;
         }
     }else if(sudokuMode == LARGE_SUDOKU){
         if(difficulty == 0){
+            visible = 140;
+        }else if(difficulty == 1){
+            visible = 125;
+        }else if(difficulty == 3){
+            visible = 115;
+        }
+    }else if(sudokuMode == KILLER_LARGE_SUDOKU){
+        if(difficulty == 0){
             visible = 130;
         }else if(difficulty == 1){
-            visible = 110;
+            visible = 120;
         }else if(difficulty == 3){
-            visible = 90;
+            visible = 110;
         }
     }
 
+    // answerをquestionへコピー
+    for(int row = 0; row < boardSize; row++){
+        for(int col = 0; col < boardSize; col++){
+            question[row][col] = answer[row][col];
+        }
+    }
+
+    bool checked[MAX_BOARD_SIZE][MAX_BOARD_SIZE] = {};
+
+    int removeCount = boardSize * boardSize - visible;
     int count = 0;
-    while(count < visible){
+    int failCount = 0;
+    while(count < removeCount && failCount < 150){
         int row = rand() % boardSize;
         int col = rand() % boardSize;
 
-        if(question[row][col] == 0){
-            question[row][col] = answer[row][col];
-            count++;
+        if(checked[row][col]){
+            continue;
         }
-    }
 
-}
+        if(question[row][col] != 0){
+            int backup = question[row][col];
+            // 仮に削除
+            question[row][col] = 0;
 
-void Sudoku::CreateKillerQuestion(){
+            // 唯一解なら削除確定
+            if(CheckUnique()){
+                count++;
+                failCount = 0;
+                checked[row][col] = true; 
+                printf("remove success %d\n", count);
+            }else{
+                // 戻す
+                question[row][col] = backup;
+                checked[row][col] = true; 
+                failCount++;
+                printf("remove failed\n");
+            }
+        }
 
-    //普通の数独解答を作成
-    CreateQuestion();
+        bool remain = false;
 
-    //ケージ作成
-    while(true){
-        if(CreateCage()){
+        for(int r = 0; r < boardSize; r++){
+            for(int c = 0; c < boardSize; c++){
+                if(!checked[r][c]){
+                    remain = true;
+                    break;
+                }
+            }
+            if(remain) break;
+        }
+
+        if(!remain){
             break;
         }
     }
 }
 
+void Sudoku::CreateKillerQuestion(){
+
+    timerStop = true;
+
+    //普通の数独解答を作成
+    CreateQuestion();
+
+    //ケージ作成
+    if(sudokuMode == KILLER_SUDOKU){
+        while(true){
+            if(CreateCage()){
+                break;
+            }
+        }
+    }else if(sudokuMode == KILLER_LARGE_SUDOKU){
+        while(true){
+            if(CreateLargeCage()){
+                break;
+            }
+        }
+    }
+
+    ResetTimer();
+    
+}
+
 bool Sudoku::CreateCage(){
+    printf("CreateCage start\n");
     cageCount = 0;
 
     // 全マス未使用
@@ -270,7 +338,7 @@ bool Sudoku::CreateCage(){
     }
 
     // ケージサイズ一覧を作る
-    int cageSize[50];
+    int cageSize[256];
     int cageNum = 0;
     int total = 0;
     while(total < boardSize * boardSize){
@@ -346,6 +414,115 @@ bool Sudoku::CreateCage(){
             cages[i].sum += answer[row][col];
         }
     }
+
+    printf("CreateCage end\n");
+
+    return true;
+}
+
+bool Sudoku::CreateLargeCage(){
+
+    printf("CreateLargeCage start\n");
+
+    cageCount = 0;
+
+    // 初期化
+    for(int r = 0; r < boardSize; r++){
+        for(int c = 0; c < boardSize; c++){
+            cageMap[r][c] = -1;
+        }
+    }
+
+    while(true){
+        // 未使用セルを探す
+        int startRow = -1;
+        int startCol = -1;
+        for(int r = 0; r < boardSize; r++){
+            for(int c = 0; c < boardSize; c++){
+                if(cageMap[r][c] == -1){
+                    startRow = r;
+                    startCol = c;
+                    break;
+                }
+            }
+
+            if(startRow != -1){
+                break;
+            }
+        }
+
+        // 全セル使用済み
+        if(startRow == -1){
+            break;
+        }
+
+        // 残りマス数
+        int remain = 0;
+        for(int r = 0; r < boardSize; r++){
+            for(int c = 0; c < boardSize; c++){
+                if(cageMap[r][c] == -1){
+                    remain++;
+                }
+            }
+        }
+
+        int target;
+        // 最後の端数処理
+        if(remain <= 6){
+            target = remain;
+        }else{
+            // サイズ割合
+            int rand = GetRandomValue(1,100);
+            if(rand <= 5){
+                target = 1;       // 10%
+            }else if(rand <= 35){
+                target = 2;       // 25%
+            }else if(rand <= 70){
+                target = 3;       // 30%
+            }else if(rand <= 90){
+                target = 4;       // 20%
+            }else if(rand <= 98){
+                target = 5;       // 10%
+            }else{
+                target = 6;       // 5%
+            }
+        }
+
+        GrowLargeCage(startRow,startCol,target);
+
+        // 作成成功
+        if(cages[cageCount].count >= 1){
+            cageCount++;
+        }else{
+            // 失敗した場合は1マスケージとして登録
+            cages[cageCount].row[0] = startRow;
+            cages[cageCount].col[0] = startCol;
+            cages[cageCount].count = 1;
+
+            cageMap[startRow][startCol] = cageCount;
+
+            cageCount++;
+        }
+    }
+
+    // 1マスケージを吸収
+    MergeSingleCellCage();
+    // 空ケージを詰める
+    CompressCage();
+
+    // 合計計算
+    for(int i = 0; i < cageCount; i++){
+        cages[i].sum = 0;
+
+        for(int j = 0; j < cages[i].count; j++){
+            int r = cages[i].row[j];
+            int c = cages[i].col[j];
+
+            cages[i].sum += answer[r][c];
+        }
+    }
+
+    printf("CreateLargeCage end\n");
 
     return true;
 }
@@ -428,6 +605,84 @@ void Sudoku::GrowCage(int startRow, int startCol, int targetSize){
     }
 }
 
+void Sudoku::GrowLargeCage(int startRow, int startCol, int targetSize){
+
+    cages[cageCount].count = 0;
+
+    // 最初のセル
+    cages[cageCount].row[0] = startRow;
+    cages[cageCount].col[0] = startCol;
+    cages[cageCount].count = 1;
+
+    cageMap[startRow][startCol] = cageCount;
+
+    while(cages[cageCount].count < targetSize){
+        int candRow[MAX_BOARD_SIZE * MAX_BOARD_SIZE];
+        int candCol[MAX_BOARD_SIZE * MAX_BOARD_SIZE];
+        int candCount = 0;
+
+        for(int i = 0; i < cages[cageCount].count; i++){
+            int row=cages[cageCount].row[i];
+            int col=cages[cageCount].col[i];
+
+            int dr[4]={-1, 1, 0, 0};
+            int dc[4]={ 0, 0,-1, 1};
+
+            for(int d = 0; d < 4; d++){
+                int nr = row + dr[d];
+                int nc = col + dc[d];
+
+                if(nr < 0 || nr >= boardSize || nc < 0 || nc >= boardSize){
+                    continue;
+                }
+
+                if(cageMap[nr][nc] != -1){
+                    continue;
+                }
+
+                bool exist = false;
+                for(int k = 0; k < candCount; k++){
+                    if(candRow[k] == nr && candCol[k] == nc){
+                        exist = true;
+                        break;
+                    }
+                }
+
+                if(!exist){
+                    candRow[candCount] = nr;
+                    candCol[candCount] = nc;
+                    candCount++;
+                }
+            }
+        }
+
+        // 追加できない
+        if(candCount == 0){
+            // 全部戻す
+            for(int i = 0; i < cages[cageCount].count; i++){
+                int r = cages[cageCount].row[i];
+                int c = cages[cageCount].col[i];
+
+                cageMap[r][c] = -1;
+            }
+
+            cages[cageCount].count = 0;
+
+            return;
+        }
+
+        int choose = GetRandomValue(0, candCount - 1);
+        int p = cages[cageCount].count;
+
+        cages[cageCount].row[p] = candRow[choose];
+        cages[cageCount].col[p] = candCol[choose];
+
+        cageMap[candRow[choose]][candCol[choose]] = cageCount;
+
+        cages[cageCount].count++;
+    }
+}
+
 bool Sudoku::HasSingleCellCage(){
     for(int i = 0; i < cageCount; i++){
         if(cages[i].count == 1){
@@ -439,67 +694,105 @@ bool Sudoku::HasSingleCellCage(){
 }
 
 void Sudoku::MergeSingleCellCage(){
-    int dr[4] = {-1, 1, 0, 0};
-    int dc[4] = { 0, 0,-1, 1};
+    for(int id = 0; id < cageCount; id++){
+        // 2マス以上なら対象外
+        if(cages[id].count >= 2){
+            continue;
+        }
 
-    for(int row = 0; row < boardSize; row++){
-        for(int col = 0; col < boardSize; col++){
-            // 未使用マスだけ対象
-            if(cageMap[row][col] != -1){
+        int row = cages[id].row[0];
+        int col = cages[id].col[0];
+
+        int candidate[4];
+        int candidateCount = 0;
+
+        int dr[4] = {-1,1,0,0};
+        int dc[4] = {0,0,-1,1};
+
+        // 隣接ケージを探す
+        for(int d = 0; d < 4; d++){
+            int nr = row + dr[d];
+            int nc = col + dc[d];
+
+            if(nr < 0 || nr >= boardSize || nc < 0 || nc >= boardSize){
                 continue;
             }
 
-            int candidate[4];
-            int candidateCount = 0;
+            int next = cageMap[nr][nc];
+            if(next == -1 || next == id){
+                continue;
+            }
 
-            // 隣接ケージを集める
-            for(int k = 0; k < 4; k++){
-                int nr = row + dr[k];
-                int nc = col + dc[k];
+            // 最大5マスまで
+            if(cages[next].count >= 6){
+                continue;
+            }
 
-                if(nr < 0 || nr >= boardSize || nc < 0 || nc >= boardSize){
-                    continue;
-                }
-
-                int id = cageMap[nr][nc];
-                if(id == -1){
-                    continue;
-                }
-
-                // 5マス以上にはしない
-                if(cages[id].count >= 5){
-                    continue;
-                }
-
-                // 重複防止
-                bool exist = false;
-                for(int i = 0; i < candidateCount; i++){
-                    if(candidate[i] == id){
-                        exist = true;
-                        break;
-                    }
-                }
-
-                if(!exist){
-                    candidate[candidateCount] = id;
-                    candidateCount++;
+            bool exist = false;
+            for(int i = 0; i < candidateCount; i++){
+                if(candidate[i] == next){
+                    exist = true;
+                    break;
                 }
             }
 
-            // 候補があればランダムに選ぶ
-            if(candidateCount > 0){
-                int index = GetRandomValue(0, candidateCount - 1);
-                int id = candidate[index];
-                int p = cages[id].count;
-
-                cages[id].row[p] = row;
-                cages[id].col[p] = col;
-                cages[id].count++;
-
-                cageMap[row][col] = id;
+            if(!exist){
+                candidate[candidateCount] = next;
+                candidateCount++;
             }
         }
+
+        // 吸収先なし
+        if(candidateCount == 0){
+            continue;
+        }
+
+        // ランダムで吸収先決定
+        int select = GetRandomValue(0, candidateCount - 1);
+        int target = candidate[select];
+
+        // セルを移動
+        int p = cages[target].count;
+
+        cages[target].row[p] = row;
+        cages[target].col[p] = col;
+        cages[target].count++;
+
+        cageMap[row][col] = target;
+
+        // 元ケージ削除
+        cages[id].count = 0;
     }
+}
+
+void Sudoku::CompressCage(){
+
+    int index = 0;
+    for(int i = 0; i < cageCount; i++){
+
+        if(cages[i].count == 0){
+            continue;
+        }
+
+        if(i != index){
+            cages[index] = cages[i];
+
+            // cageMapを書き換える
+            for(int r = 0; r < boardSize; r++){
+                for(int c = 0; c < boardSize; c++){
+
+                    if(cageMap[r][c] == i){
+                        cageMap[r][c] = index;
+                    }
+
+                }
+            }
+        }
+
+        index++;
+    }
+
+    cageCount = index;
 }
 
 int Sudoku::CountUnusedCell() const{
@@ -625,25 +918,25 @@ void Sudoku::Update(char my_name[100], int& nameLength){
         }else if(IsKeyPressed(KEY_NINE) || IsKeyPressed(KEY_KP_9)){
             board[selectedRow][selectedCol] = 9;
             selectedNumber = 9;
-        }else if(IsKeyPressed(KEY_A) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_A) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 10;
             selectedNumber = 10;
-        }else if(IsKeyPressed(KEY_B) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_B) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 11;
             selectedNumber = 11;
-        }else if(IsKeyPressed(KEY_C) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_C) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 12;
             selectedNumber = 12;
-        }else if(IsKeyPressed(KEY_D) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_D) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 13;
             selectedNumber = 13;
-        }else if(IsKeyPressed(KEY_E) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_E) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 14;
             selectedNumber = 14;
-        }else if(IsKeyPressed(KEY_F) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_F) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 15;
             selectedNumber = 15;
-        }else if(IsKeyPressed(KEY_G) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_G) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             board[selectedRow][selectedCol] = 16;
             selectedNumber = 16;
         }else if(IsKeyPressed(KEY_ZERO) || IsKeyPressed(KEY_KP_0)){
@@ -709,43 +1002,43 @@ void Sudoku::Update(char my_name[100], int& nameLength){
                 //追加した場合
                 selectedNumber = 9;
             }
-        }else if(IsKeyPressed(KEY_A) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_A) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][10] = !memo[selectedRow][selectedCol][10];
             if(memo[selectedRow][selectedCol][10]){
                 //追加した場合
                 selectedNumber = 10;
             }
-        }else if(IsKeyPressed(KEY_B) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_B) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][11] = !memo[selectedRow][selectedCol][11];
             if(memo[selectedRow][selectedCol][11]){
                 //追加した場合
                 selectedNumber = 11;
             }
-        }else if(IsKeyPressed(KEY_C) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_C) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][12] = !memo[selectedRow][selectedCol][12];
             if(memo[selectedRow][selectedCol][12]){
                 //追加した場合
                 selectedNumber = 12;
             }
-        }else if(IsKeyPressed(KEY_D) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_D) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][13] = !memo[selectedRow][selectedCol][13];
             if(memo[selectedRow][selectedCol][13]){
                 //追加した場合
                 selectedNumber = 13;
             }
-        }else if(IsKeyPressed(KEY_E) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_E) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][14] = !memo[selectedRow][selectedCol][14];
             if(memo[selectedRow][selectedCol][14]){
                 //追加した場合
                 selectedNumber = 14;
             }
-        }else if(IsKeyPressed(KEY_F) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_F) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][15] = !memo[selectedRow][selectedCol][15];
             if(memo[selectedRow][selectedCol][15]){
                 //追加した場合
                 selectedNumber = 15;
             }
-        }else if(IsKeyPressed(KEY_G) && sudokuMode == LARGE_SUDOKU){
+        }else if(IsKeyPressed(KEY_G) && (sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU)){
             memo[selectedRow][selectedCol][16] = !memo[selectedRow][selectedCol][16];
             if(memo[selectedRow][selectedCol][16]){
                 //追加した場合
@@ -816,16 +1109,19 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
         title = "SUDOKU";
     }else if(sudokuMode == KILLER_SUDOKU){
         title = "KILLER SUDOKU";
-    }else{
+    }else if(sudokuMode == LARGE_SUDOKU){
         title = "LARGE SUDOKU";
+    }else{
+        title = "KILLER LARGE SUDOKU";
     }
 
     int titleWidth = MeasureText(title,40);
     DrawText(title, (GetScreenWidth() - titleWidth) / 2, 20, 40, WHITE);
     
     DrawRectangleRec(retireBtn, RED);
-    if(sudokuMode == LARGE_SUDOKU){
+    if(sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU){
         DrawTextEx(font, "Retire", {980, 15}, 25, 2, BLACK);
+        DrawTextEx(font, "A:10 B:11 C:12 D:13 E:14 F:15 G:16", {330, 95}, 25, 5, WHITE);
     }else{
         DrawTextEx(font, "Retire", {680, 15}, 25, 2, BLACK);
     }
@@ -888,114 +1184,59 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
                     if(memo[row][col][num]){
                         Color memoColor = BLACK;
                         Color cellColor = ORANGE;
-                        
+
                         cellX = START_X + col * CELL_SIZE;
                         cellY = START_Y + row * CELL_SIZE;
 
-                        int gridSize;
                         int num_size;
                         int rectangle_size;
-                        if(sudokuMode == LARGE_SUDOKU){
-                            gridSize = 4;
-                            num_size = 6;
-                            rectangle_size = 8;
-                        }else{
-                            gridSize = 3;
-                            num_size = 11;
-                            rectangle_size = 11;
-                        }
 
-                        if(sudokuMode == KILLER_SUDOKU){
-                            switch (num){
+                        int memoRow;
+                        int memoCol;
 
-                            case 1: 
-                                if(selectedNumber == 1){ 
-                                    DrawRectangle(cellX + 17, cellY + 11, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("1", cellX + 23, cellY + 12, num_size, memoColor); 
-                                break; 
-                            case 2: 
-                                if(selectedNumber == 2){ 
-                                    DrawRectangle(cellX + 25, cellY + 11, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("2", cellX + 28, cellY + 12, num_size, memoColor); 
-                                break; 
-                            case 3: 
-                                if(selectedNumber == 3){ 
-                                    DrawRectangle(cellX + 33, cellY + 11, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("3", cellX + 36, cellY + 12, num_size, memoColor); 
-                                break; 
-                            case 4: 
-                                if(selectedNumber == 4){ 
-                                    DrawRectangle(cellX + 17, cellY + 23, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("4", cellX + 20, cellY + 24, num_size, memoColor); 
-                                break; 
-                            case 5: 
-                                if(selectedNumber == 5){ 
-                                    DrawRectangle(cellX + 25, cellY + 23, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("5", cellX + 28, cellY + 24, num_size, memoColor); 
-                                break; 
-                            case 6: 
-                                if(selectedNumber == 6){ 
-                                    DrawRectangle(cellX + 33, cellY + 23, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("6", cellX + 36, cellY + 24, num_size, memoColor); 
-                                break; 
-                            case 7: 
-                                if(selectedNumber == 7){ 
-                                    DrawRectangle(cellX + 17, cellY + 33, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("7", cellX + 20, cellY + 34, num_size, memoColor); 
-                                break; 
-                            case 8: 
-                                if(selectedNumber == 8){ 
-                                    DrawRectangle(cellX + 25, cellY + 33, rectangle_size, rectangle_size, cellColor);
-                                } 
-                                DrawText("8", cellX + 28, cellY + 34, num_size, memoColor); 
-                                break; 
-                            case 9: 
-                                if(selectedNumber == 9){ 
-                                    DrawRectangle(cellX + 33, cellY + 33, rectangle_size, rectangle_size, cellColor); 
-                                } 
-                                DrawText("9", cellX + 36, cellY + 34, num_size, memoColor); 
-                                break; 
-                            default: 
-                                break; 
-                            }
+                        float space;
+                        float offsetX;
+                        float offsetY;
 
-                        }else{
-                            // メモ配置
-                            int memoRow;
-                            int memoCol;
+                        if(sudokuMode == NORMAL_SUDOKU || sudokuMode == KILLER_SUDOKU){
+                            // 3×3配置
+                            int index = num - 1;
 
-                            float space;
-                            float offsetX;
-                            float offsetY;
+                            memoRow = index / 3;
+                            memoCol = index % 3;
 
-                            // NORMAL
-                            if(sudokuMode == NORMAL_SUDOKU){
+                            if(sudokuMode == KILLER_SUDOKU){
+                                space = CELL_SIZE / 5.0f;
+                                offsetX = 15;
+                                offsetY = 15;
 
-                                int index = num - 1;
+                                num_size = 8;
+                                rectangle_size = 8;
 
-                                memoRow = index / 3;
-                                memoCol = index % 3;
-
+                            }else{
                                 space = CELL_SIZE / 3.0f;
                                 offsetX = 3;
                                 offsetY = 2;
 
                                 num_size = 11;
                                 rectangle_size = 11;
+                            }
+                        }else{
+                            // 4×4配置
+                            int index = num - 1;
 
-                            }else{ // LARGE
+                            memoRow = index / 4;
+                            memoCol = index % 4;
 
-                                int index = num - 1;
+                            if(sudokuMode == KILLER_LARGE_SUDOKU){
+                                space = CELL_SIZE / 6.33f;
+                                offsetX = 12;
+                                offsetY = 14;
 
-                                memoRow = index / 4;
-                                memoCol = index % 4;
+                                num_size = 3;
+                                rectangle_size = 7;
+
+                            }else{
 
                                 space = CELL_SIZE / 5.0f;
                                 offsetX = 3;
@@ -1003,27 +1244,24 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
 
                                 num_size = 6;
                                 rectangle_size = 7;
-
                             }
-
-                            // 選択中の強調
-                            if(selectedNumber == num){
-                                DrawRectangle(cellX + offsetX + memoCol * space, cellY + offsetY + memoRow * space, rectangle_size, rectangle_size, cellColor);
-                            }
-
-                            // 表示文字
-                            const char* text;
-                            if(num <= 9){
-                                text = TextFormat("%d", num);
-                            }else{
-                                text = TextFormat("%c", 'A' + num - 10);
-                            }
-
-                            DrawText(text,cellX + offsetX + memoCol * space + 2, cellY + offsetY + memoRow * space, num_size, memoColor);
                         }
+
+                        if(selectedNumber == num){
+                            DrawRectangle(cellX + offsetX + memoCol * space, cellY + offsetY + memoRow * space, rectangle_size, rectangle_size, cellColor);
+                        }
+
+                        const char* text;
+                        if(num <= 9){
+                            text = TextFormat("%d", num);
+                        }else{
+                            text = TextFormat("%c", 'A' + num - 10);
+                        }
+
+                        DrawText(text, cellX + offsetX + memoCol * space + 2, cellY + offsetY + memoRow * space, num_size, memoColor);
                     }
                 }
-            }    
+            }
         }
     }
 
@@ -1042,8 +1280,9 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
         DrawLineEx({START_X, START_Y + i * CELL_SIZE}, {START_X + boardSize * CELL_SIZE, START_Y + i * CELL_SIZE}, thick, BLACK);
     }
 
-    if(sudokuMode == KILLER_SUDOKU){
+    if(sudokuMode == KILLER_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU){
         Color cageColor = MAGENTA;
+        int num_size = 15;
         for(int i = 0; i < cageCount; i++){
 
             if(cages[i].count == 0){
@@ -1063,7 +1302,12 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
                 }
             }
 
-            DrawText(TextFormat("%d", cages[i].sum), START_X + col * CELL_SIZE + 5, START_Y + row * CELL_SIZE + 4, 15, BLACK);
+            if(sudokuMode == KILLER_SUDOKU){
+                num_size = 15;
+            }else{
+                num_size = 12;
+            }
+            DrawText(TextFormat("%d", cages[i].sum), START_X + col * CELL_SIZE + 5, START_Y + row * CELL_SIZE + 4, num_size, BLACK);
         }
 
         for(int row = 0; row < boardSize; row++){
@@ -1084,12 +1328,12 @@ void Sudoku::Draw(Font font, int difficulty, const char my_name[]){
                 }
 
                 // 下
-                if(row == 8 || GetCageIndex(row + 1, col) != now){
+                if(row == boardSize - 1 || GetCageIndex(row + 1, col) != now){
                     DrawLine(x + difference, y + CELL_SIZE - difference, x + CELL_SIZE - difference, y + CELL_SIZE - difference, cageColor);
                 }
 
                 // 右
-                if(col == 8 || GetCageIndex(row, col + 1) != now){
+                if(col == boardSize - 1 || GetCageIndex(row, col + 1) != now){
                     DrawLine(x + CELL_SIZE - difference, y + difference, x + CELL_SIZE - difference, y + CELL_SIZE - difference, cageColor);
                 }
             }
@@ -1265,8 +1509,8 @@ bool Sudoku::CheckCage(){
 
         int sum = 0;
         for(int j = 0; j < cages[i].count; j++){
-            int row=(int)cages[i].row[j];
-            int col=(int)cages[i].col[j];
+            int row = (int)cages[i].row[j];
+            int col = (int)cages[i].col[j];
             if(question[row][col] != 0){
                 sum += question[row][col];
             }else{
@@ -1436,7 +1680,7 @@ void Sudoku::ResetTimer(){
 }
 
 void Sudoku::StartGame(){
-    if(sudokuMode == LARGE_SUDOKU){
+    if(sudokuMode == LARGE_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU){
         SetWindowSize(1100, 950);
     }else{
         SetWindowSize(800, 600);
@@ -1446,11 +1690,10 @@ void Sudoku::StartGame(){
     ResetTimer();
 
     InitBoard();
-    if(sudokuMode == KILLER_SUDOKU){
+    if(sudokuMode == KILLER_SUDOKU || sudokuMode == KILLER_LARGE_SUDOKU){
         CreateKillerQuestion();
     }else{
         CreateQuestion();
-
     }
 }
 
@@ -1462,6 +1705,8 @@ void Sudoku::SetSudokuFlag(int flag){
         sudokuMode = KILLER_SUDOKU;
     }else if(flag == 2){
         sudokuMode = LARGE_SUDOKU;
+    }else if(flag == 3){
+        sudokuMode = KILLER_LARGE_SUDOKU;
     }
 }
 
@@ -1475,4 +1720,136 @@ Sudoku::SudokuMode Sudoku::GetSudokuMode() const{
 
     return sudokuMode;
 
+}
+
+void Sudoku::SolveCount(int board[MAX_BOARD_SIZE][MAX_BOARD_SIZE]){
+    // 2個以上解が見つかったら終了
+    if(solutionCount > 1){
+        return;
+    }
+
+    int row = -1;
+    int col = -1;
+
+    // 最小候補数
+    int minCandidate = boardSize + 1;
+
+    // 選択したマスの候補保存
+    int bestCandidates[MAX_BOARD_SIZE];
+    int bestCount = 0;
+
+    // 候補数が最小の空白マスを探す
+    for(int i = 0; i < boardSize; i++){
+        for(int j = 0; j < boardSize; j++){
+            if(board[i][j] != 0){
+                continue;
+            }
+
+            int candidates[MAX_BOARD_SIZE];
+            int count = 0;
+
+            // 候補を調べる
+            for(int num = 1; num <= boardSize; num++){
+                if(CanPlace(board, i, j, num)){
+                    candidates[count] = num;
+                    count++;
+                }
+            }
+
+            // 候補なし
+            if(count == 0){
+                return;
+            }
+
+            // 最小候補のマスを保存
+            if(count < minCandidate){
+                minCandidate = count;
+
+                row = i;
+                col = j;
+
+                bestCount = count;
+
+                for(int k = 0; k < count; k++){
+                    bestCandidates[k] = candidates[k];
+                }
+
+                // 候補1なら最優先
+                if(count == 1){
+                    goto SEARCH;
+                }
+            }
+        }
+    }
+
+SEARCH:
+
+    // 全て埋まった
+    if(row == -1){
+        solutionCount++;
+        return;
+    }
+
+    // 保存した候補だけ試す
+    for(int i = 0; i < bestCount; i++){
+        int num = bestCandidates[i];
+
+        board[row][col] = num;
+
+        SolveCount(board);
+
+        board[row][col] = 0;
+
+        // 2解以上なら終了
+        if(solutionCount > 1){
+            return;
+        }
+    }
+}
+
+bool Sudoku::CanPlace(int board[MAX_BOARD_SIZE][MAX_BOARD_SIZE], int row, int col, int num){
+
+    // 行チェック
+    for(int i = 0; i < boardSize; i++){
+        if(board[row][i] == num){
+            return false;
+        }
+    }
+
+    // 列チェック
+    for(int i = 0; i < boardSize; i++){
+        if(board[i][col] == num){
+            return false;
+        }
+    }
+
+    // ブロックチェック
+    int boxRow = row / boardBrock * boardBrock;
+    int boxCol = col / boardBrock * boardBrock;
+
+    for(int i = 0; i < boardBrock; i++){
+        for(int j = 0; j < boardBrock; j++){
+            if(board[boxRow+i][boxCol+j] == num){
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Sudoku::CheckUnique(){
+    int temp[MAX_BOARD_SIZE][MAX_BOARD_SIZE];
+    // コピー
+    for(int i = 0; i < boardSize; i++){
+        for(int j = 0; j < boardSize; j++){
+            temp[i][j] = question[i][j];
+        }
+    }
+
+    solutionCount=0;
+
+    SolveCount(temp);
+
+    return solutionCount == 1;
 }

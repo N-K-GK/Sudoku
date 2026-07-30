@@ -6,9 +6,10 @@ Game::Game(){
     scene = START;
 
     sudokuBtn = {260, 180, 300, 60};
-    killersudokuBtn = {260, 280, 300, 60};
-    largesudokuBtn = {260, 380, 300, 60};
-    exitBtn  = {260, 480, 300, 60};
+    killersudokuBtn = {260, 260, 300, 60};
+    largesudokuBtn = {260, 340, 300, 60};
+    killerlargeBtn = {260, 420, 300, 60};
+    exitBtn  = {260, 500, 300, 60};
 
     my_name[0] = '\0';
     nameLength = 0;
@@ -40,6 +41,11 @@ void Game::Update(){
 
         if(CheckCollisionPointRec(GetMousePosition(), largesudokuBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
             sudoku.SetSudokuFlag(2);
+            scene = MENU;
+        }
+
+        if(CheckCollisionPointRec(GetMousePosition(), killerlargeBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
+            sudoku.SetSudokuFlag(3);
             scene = MENU;
         }
 
@@ -130,13 +136,16 @@ void Game::Draw(){
         DrawTextEx(jpFont, "SUDOKU", {360, 195}, 30, 2, BLACK);
 
         DrawRectangleRec(killersudokuBtn, ORANGE);
-        DrawTextEx(jpFont, "KILLER SUDOKU", {320, 295}, 30, 2, BLACK);
+        DrawTextEx(jpFont, "KILLER SUDOKU", {320, 275}, 30, 2, BLACK);
 
         DrawRectangleRec(largesudokuBtn, PURPLE);
-        DrawTextEx(jpFont, "LARGE SUDOKU", {330, 395}, 30, 2, BLACK);
+        DrawTextEx(jpFont, "LARGE SUDOKU", {330, 355}, 30, 2, BLACK);
+
+        DrawRectangleRec(killerlargeBtn, PINK);
+        DrawTextEx(jpFont, "KILLER LARGE SUDOKU", {275, 435}, 30, 2, BLACK);
 
         DrawRectangleRec(exitBtn, RED);
-        DrawTextEx(jpFont, "EXIT", {380, 495}, 30, 2, BLACK);
+        DrawTextEx(jpFont, "EXIT", {380, 515}, 30, 2, BLACK);
 
         break;
 
