@@ -272,13 +272,11 @@ void Sudoku::CreateQuestion(){
                 count++;
                 failCount = 0;
                 checked[row][col] = true; 
-                printf("remove success %d\n", count);
             }else{
                 // 戻す
                 question[row][col] = backup;
                 checked[row][col] = true; 
                 failCount++;
-                printf("remove failed\n");
             }
         }
 
