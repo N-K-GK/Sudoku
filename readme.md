@@ -2,7 +2,7 @@
 
 C++とraylibを用いて制作した数独ゲームです。
 
-通常数独・キラー数独・16×16大型数独の3種類をプレイできます。  
+通常数独・キラー数独・16×16大型数独・16×16大型キラー数独の4種類をプレイできます。
 問題はランダム生成され、メモ機能やタイマー、難易度選択なども実装しています。
 
 ## 開発環境
@@ -19,6 +19,7 @@ C++とraylibを用いて制作した数独ゲームです。
 | Normal Sudoku | 9×9 |
 | Killer Sudoku | 9×9 |
 | Large Sudoku | 16×16 |
+| Killer Large Sudoku | 16×16 |
 
 ## スクリーンショット
 
@@ -38,9 +39,13 @@ C++とraylibを用いて制作した数独ゲームです。
 
 ![Large Sudoku](screenshots/large_veryhard.png)
 
+### Killer Large Sudoku
+
+![Killer Large Sudoku](screenshots/killer_large_normal.png)
+
 ## 機能
 
-- ゲーム選択(数独 / キラー数独 / 大型数独)
+- ゲーム選択(数独 / キラー数独 / 大型数独 / 大型キラー数独)
 - ランダム問題生成
 - 難易度選択(Normal / Hard / Very Hard)
 - 名前入力
@@ -81,10 +86,6 @@ This project also uses:
 ### Linux (WSL)
 
 ```bash
-g++ src/*.cpp -o Sudoku \
--Iinclude \
--I/usr/local/include \
--L/usr/local/lib \
--lraylib -lGL -lm -lpthread -ldl -lrt -lX11
+g++ src/*.cpp -o Sudoku -I/usr/local/include -L/usr/local/lib -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
 ./Sudoku
